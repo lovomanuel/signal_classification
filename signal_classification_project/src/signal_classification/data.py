@@ -1,5 +1,5 @@
 import torch
-from torchvision import transforms
+from torchvision.transforms import Compose, ToTensor, Resize, RandomRotation, RandomHorizontalFlip, ColorJitter, Normalize
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset, random_split
@@ -9,7 +9,9 @@ from PIL import Image
 
 ##aggiungi funzione iniziale per scaricare il dataset se non già scaricato
 
-PATH = "../../data/raw/gtsrb/GTSRB"
+#capisci se devi salvare il file modificato o no
+
+PATH = "data/raw/gtsrb/GTSRB" ##uniforma questo in modo che da qualsiasi parte io lo runni funzioni
 
 classes = { 0:'Speed limit (20km/h)',
             1:'Speed limit (30km/h)', 
@@ -55,7 +57,13 @@ classes = { 0:'Speed limit (20km/h)',
             41:'End of no passing', 
             42:'End no passing veh > 3.5 tons' }
 
-transforms = transforms.Compose([ToTensor(), transforms.Resize((32, 32))])
+
+transforms = Compose([
+    Resize((32, 32)),  # Resize to the target size
+    RandomRotation(degrees=15),  # Randomly rotate images by up to 15 degrees
+    RandomHorizontalFlip(p=0.5),  # Randomly flip the images horizontally  # Apply random changes to brightness, contrast, etc.
+    ToTensor()  # Convert to tensor
+])
 
 class GTSRBDataset(Dataset): #class with inheritance from Dataset class
     def __init__(self, root: str, split: str, transform=None): #constructor: root is the path to the dataset, split is the split of the dataset (train or test)
@@ -75,7 +83,7 @@ class GTSRBDataset(Dataset): #class with inheritance from Dataset class
             for subfolder in os.listdir(split_path): #for each subfolder in the directory
                 subfolder_path = os.path.join(split_path, subfolder)
                 if os.path.isdir(subfolder_path):  # Check if it's a directory
-                    label = subfolder[-1:]  # Get the label from the folder name
+                    label = subfolder[-2:]  # Get the label from the folder name
                     self.labels.append(label) # Append the label to the labels list
                     for img_name in os.listdir(subfolder_path):
                         if img_name.endswith('.ppm'):
@@ -103,6 +111,7 @@ class GTSRBDataset(Dataset): #class with inheritance from Dataset class
         img = Image.open(img_path) #The function Image.open() opens an image file from the specified file path (img_path) and creates an instance of PIL.Image.Image, which provides methods and attributes to manipulate the image (e.g., resizing, cropping, and format conversion). It does not load the entire image into memory immediately but instead opens a file pointer to access the image data. This deferred loading means the image is only fully read into memory when operations are performed or when it is converted to another format.
         if self.transform:
             img = self.transform(img)
+        label = torch.tensor(int(label), dtype=torch.long) 
         return img, label
     
 def get_data_loaders(batch_size: int, split_percentage: float):
@@ -129,49 +138,22 @@ def get_data_loaders(batch_size: int, split_percentage: float):
 #sistema questa funzione per mostrare le immagini
 
 def show_images(loader, classes):
-    # Dictionary to track one image per label
-    label_to_image = {}
-
-    for images, labels in loader: #Tensor of shape (batch_size, channels, height, width) and tensor of shape (batch_size, _)
-        for img, label in zip(images, labels): #zip() function takes two equal-length collections, and merges them together in pairs. It returns an iterator that produces tuples containing elements from both collections.
-            label = int(label)  # Ensure label is an integer
-            if label not in label_to_image:  # Add only if the label is not yet displayed
-                label_to_image[label] = img
-            if len(label_to_image) == len(classes):  # Stop if we have all labels
-                break
-        if len(label_to_image) == len(classes):  # Break outer loop if all labels are found
-            break
-
-    # Create the figure for displaying images
-    num_labels = len(label_to_image)
-    rows = (num_labels // 6) + 1  # Adjust rows dynamically
-    cols = min(num_labels, 6)     # Limit columns to a maximum of 6
-    fig = plt.figure(figsize=(cols * 3, rows * 3))
-
-    # Display each image with its label
-    for idx, (label, img) in enumerate(label_to_image.items()):
+    #take a random loader 
+    dataiter = iter(loader)
+    images, labels = next(dataiter)
+    fig = plt.figure(figsize=(9, 9))
+    #fig name
+    fig.suptitle('Random Images from the Dataset', fontsize=16)
+    rows, cols = 4, 4
+    for idx in range(rows * cols):
+        random_idx = torch.randint(0, len(loader.dataset), size=[1]).item()
+        img, label = loader.dataset[random_idx]
         ax = fig.add_subplot(rows, cols, idx + 1)
-        ax.axis('off')  # Turn off axis
-        ax.set_title(classes[label])  # Set title based on label
-        img = img.clamp(0, 1)  # Clip values to [0, 1]
-        ax.imshow(img.permute(1, 2, 0))  # Convert CHW to HWC for display
-
+        ax.imshow(img.permute(1, 2, 0))
+        ax.set_title(classes[label.item()])
+        ax.axis('off')
     plt.tight_layout()
     plt.show()
-
-if __name__ == "__main__":
-    train_loader, test_loader, val_loader = get_data_loaders(batch_size=64, split_percentage=0.8)
-    images, labels = next(iter(train_loader))
-
-    # Print basic information about the batch
-    print(f"Number of images in batch: {len(images)}")
-    print(f"Shape of each image tensor: {images[0].shape}")  # Shape of a single image
-    print(f"Labels in the batch: {labels}")  # Display all labels in the batch
-
-    # Investigate the first image in the batch
-    print(f"First image tensor:\n{images[0]}")
-    print(f"First label: {labels[0]}")
-
 
 
 
