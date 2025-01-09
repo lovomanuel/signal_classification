@@ -6,69 +6,16 @@ from torch.utils.data import Dataset, random_split
 import matplotlib.pyplot as plt
 import os
 from PIL import Image
+from config import load_config
 
 ##aggiungi funzione iniziale per scaricare il dataset se non già scaricato
 
 #capisci se devi salvare il file modificato o no
 
-PATH = "data/raw/gtsrb/GTSRB" ##uniforma questo in modo che da qualsiasi parte io lo runni funzioni
-
-classes = { 0:'Speed limit (20km/h)',
-            1:'Speed limit (30km/h)', 
-            2:'Speed limit (50km/h)', 
-            3:'Speed limit (60km/h)', 
-            4:'Speed limit (70km/h)', 
-            5:'Speed limit (80km/h)', 
-            6:'End of speed limit (80km/h)', 
-            7:'Speed limit (100km/h)', 
-            8:'Speed limit (120km/h)', 
-            9:'No passing', 
-            10:'No passing veh over 3.5 tons', 
-            11:'Right-of-way at intersection', 
-            12:'Priority road', 
-            13:'Yield', 
-            14:'Stop', 
-            15:'No vehicles', 
-            16:'Veh > 3.5 tons prohibited', 
-            17:'No entry', 
-            18:'General caution', 
-            19:'Dangerous curve left', 
-            20:'Dangerous curve right', 
-            21:'Double curve', 
-            22:'Bumpy road', 
-            23:'Slippery road', 
-            24:'Road narrows on the right', 
-            25:'Road work', 
-            26:'Traffic signals', 
-            27:'Pedestrians', 
-            28:'Children crossing', 
-            29:'Bicycles crossing', 
-            30:'Beware of ice/snow',
-            31:'Wild animals crossing', 
-            32:'End speed + passing limits', 
-            33:'Turn right ahead', 
-            34:'Turn left ahead', 
-            35:'Ahead only', 
-            36:'Go straight or right', 
-            37:'Go straight or left', 
-            38:'Keep right', 
-            39:'Keep left', 
-            40:'Roundabout mandatory', 
-            41:'End of no passing', 
-            42:'End no passing veh > 3.5 tons' }
-
-
-transforms = Compose([
-    Resize((32, 32)),  # Resize to the target size
-    RandomRotation(degrees=15),  # Randomly rotate images by up to 15 degrees
-    RandomHorizontalFlip(p=0.5),  # Randomly flip the images horizontally  # Apply random changes to brightness, contrast, etc.
-    ToTensor()  # Convert to tensor
-])
-
-class GTSRBDataset(Dataset): #class with inheritance from Dataset class
+class GTSRBDatasetRaw(Dataset): #class with inheritance from Dataset class
     def __init__(self, root: str, split: str, transform=None): #constructor: root is the path to the dataset, split is the split of the dataset (train or test)
-        if split not in ['train', 'test']:
-            raise ValueError('split must be either "train" or "test"')
+        if split not in ['train', 'test', 'val']:
+            raise ValueError('split must be either "train" or "test" or "val"')
         self.root = root 
         self.split = split
         self.transform = transform
@@ -114,22 +61,81 @@ class GTSRBDataset(Dataset): #class with inheritance from Dataset class
         label = torch.tensor(int(label), dtype=torch.long) 
         return img, label
     
-def get_data_loaders(batch_size: int, split_percentage: float):
-    train_data = GTSRBDataset(root=PATH, split='train', transform=transforms)
-    test_data = GTSRBDataset(root=PATH, split='test', transform=transforms)
+class GTSRBDatasetProcessed(Dataset):
+    def __init__(self, processed_path: str, split: str):
+        if split not in ['train', 'test', 'val']:
+            raise ValueError('split must be either "train" or "test" or "val"')
+        self.processed_path = processed_path
+        self.split = split
+        self.data = []
+        split_path = os.path.join(processed_path, split)
+        for file in os.listdir(split_path):
+            if file.endswith('.pt'):
+                file_path = os.path.join(split_path, file)
+                self.data.append(file_path)
+    
+    def __len__(self):
+        return len(self.data)
 
-    train_size = int(split_percentage * len(train_data))  # 80% for training
-    val_size = len(train_data) - train_size  # 20% for validation
+    def __getitem__(self, idx):
+        file_path = self.data[idx]
+        img, label = torch.load(file_path, weights_only=True)
+        return img, label
+    
+# Save preprocessed data to disk
+def save_processed_data(loader, output_path, split):
+    split_path = os.path.join(output_path, split)
+    os.makedirs(split_path, exist_ok=True)
+    for idx, (img, label) in enumerate(loader):
+        img = img.squeeze(0)
+        label = label.squeeze(0)
+        file_path = os.path.join(split_path, f"{split}_img_{idx}.pt")
+        torch.save((img, label), file_path)
+    print(f"Saved {split} data to {split_path}")
 
-    # Split the dataset
-    train_data, val_data = random_split(train_data, [train_size, val_size])
+    
+# Main function to get DataLoaders
+def get_data_loaders(config_path: str):
+    config = load_config(config_path)
+    use_processed = config["data"]["use_processed"]
+
+    if use_processed:
+        print("Loading preprocessed data...")
+        train_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "train")
+        val_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "val")
+        test_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "test")
+
+    else:
+        print("Processing raw data...")
+        # Define transformations
+        transforms = Compose([
+            Resize(tuple(config["transforms"]["resize"])),
+            RandomRotation(degrees=config["transforms"]["rotation"]),
+            RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
+            ToTensor()
+        ])
+        train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
+        test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
+
+        # Train/Validation Split
+        train_size = int(config["data"]["split_percentage"] * len(train_data))
+        val_size = len(train_data) - train_size
+        train_data, val_data = random_split(train_data, [train_size, val_size])
+
+        # Save preprocessed data if needed
+        save_processed_data(DataLoader(train_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "train")
+        save_processed_data(DataLoader(val_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "val")
+        save_processed_data(DataLoader(test_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "test")
 
     # Create DataLoaders
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=4)
-    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, num_workers=4)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=4)
+    batch_size = config["data"]["batch_size"]
+    num_workers = config["data"]["num_workers"]
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    return train_loader, test_loader, val_loader
+    return train_loader, val_loader, test_loader
+
 
 #A DataLoader in PyTorch is an iterator that allows you to iterate over the dataset in batches, making it efficient for training and evaluation. For each iteration, it retrieves a batch of images and labels, both in the form of tensors.
 #The images are returned as a tensor of shape (batch_size, channels, height, width)
@@ -137,23 +143,7 @@ def get_data_loaders(batch_size: int, split_percentage: float):
 
 #sistema questa funzione per mostrare le immagini
 
-def show_images(loader, classes):
-    #take a random loader 
-    dataiter = iter(loader)
-    images, labels = next(dataiter)
-    fig = plt.figure(figsize=(9, 9))
-    #fig name
-    fig.suptitle('Random Images from the Dataset', fontsize=16)
-    rows, cols = 4, 4
-    for idx in range(rows * cols):
-        random_idx = torch.randint(0, len(loader.dataset), size=[1]).item()
-        img, label = loader.dataset[random_idx]
-        ax = fig.add_subplot(rows, cols, idx + 1)
-        ax.imshow(img.permute(1, 2, 0))
-        ax.set_title(classes[label.item()])
-        ax.axis('off')
-    plt.tight_layout()
-    plt.show()
+
 
 
 

@@ -1,0 +1,33 @@
+data:
+  use_processed: true  # Set to true to use preprocessed data
+  processed_path: "data/processed/"
+  raw_path: "data/raw/gtsrb/GTSRB/"
+  batch_size: 32
+  split_percentage: 0.8
+  num_workers: 4
+
+transforms:
+  resize: [32, 32]
+  rotation: 15
+  horizontal_flip: 0.5
+
+model:
+  name: "CNN"
+  num_classes: 43
+  in_channels: 3
+  hidden_dim: 128
+  dropout: 0.5
+
+loss:
+  loss: "cross_entropy"
+
+optimizer:
+  optimizer: "adam"
+
+training:
+  epochs: 10
+  lr: 0.001
+  save_model: true
+  model_path: "models/CNN/"
+
+
