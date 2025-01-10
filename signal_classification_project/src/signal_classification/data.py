@@ -95,11 +95,13 @@ def save_processed_data(loader, output_path, split):
 
     
 # Main function to get DataLoaders
-def get_data_loaders(config_path: str):
+def get_data_loaders(config_path: str, original: bool = False):
     config = load_config(config_path)
     use_processed = config["data"]["use_processed"]
+    print(use_processed)
+    print(original)
 
-    if use_processed:
+    if use_processed and not original:
         print("Loading preprocessed data...")
         train_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "train")
         val_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "val")
@@ -107,25 +109,42 @@ def get_data_loaders(config_path: str):
 
     else:
         print("Processing raw data...")
-        # Define transformations
-        transforms = Compose([
-            Resize(tuple(config["transforms"]["resize"])),
-            RandomRotation(degrees=config["transforms"]["rotation"]),
-            RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
-            ToTensor()
-        ])
-        train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
-        test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
 
-        # Train/Validation Split
-        train_size = int(config["data"]["split_percentage"] * len(train_data))
-        val_size = len(train_data) - train_size
-        train_data, val_data = random_split(train_data, [train_size, val_size])
+        if original == True:
+            print("Using original data...")
+            # Define transformations
+            transforms = Compose([
+                Resize(tuple(config["transforms"]["resize"])),
+                ToTensor()
+            ])
+            train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
+            test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
+            
+            # Train/Validation Split
+            train_size = int(config["data"]["split_percentage"] * len(train_data))
+            val_size = len(train_data) - train_size
+            train_data, val_data = random_split(train_data, [train_size, val_size])
+        else:
+            print("Using augmented data...")
+            # Define transformations
+            transforms = Compose([
+                Resize(tuple(config["transforms"]["resize"])),
+                RandomRotation(degrees=config["transforms"]["rotation"]),
+                RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
+                ToTensor()
+            ])
+            train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
+            test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
 
-        # Save preprocessed data if needed
-        save_processed_data(DataLoader(train_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "train")
-        save_processed_data(DataLoader(val_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "val")
-        save_processed_data(DataLoader(test_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "test")
+            # Train/Validation Split
+            train_size = int(config["data"]["split_percentage"] * len(train_data))
+            val_size = len(train_data) - train_size
+            train_data, val_data = random_split(train_data, [train_size, val_size])
+
+            # Save preprocessed data if needed
+            save_processed_data(DataLoader(train_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "train")
+            save_processed_data(DataLoader(val_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "val")
+            save_processed_data(DataLoader(test_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "test")
 
     # Create DataLoaders
     batch_size = config["data"]["batch_size"]
