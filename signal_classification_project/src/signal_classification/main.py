@@ -10,5 +10,5 @@ from visualize import show_predictions
 if __name__ == "__main__":
     config_path = "configs/modelv2_param1.yaml"
     
-    show_predictions(config_path)
+    evaluate(config_path)
     

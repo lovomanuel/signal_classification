@@ -7,6 +7,9 @@ from data import get_data_loaders
 from config import load_config
 from model import LinearMLP, NonLinearMLP, CNN
 from helper import get_device
+from torchmetrics import ConfusionMatrix
+from mlxtend.plotting import plot_confusion_matrix
+import matplotlib.pyplot as plt
 
 
 def evaluate(config_path):
@@ -56,6 +59,13 @@ def evaluate(config_path):
     correct = 0
     total = 0
 
+    num_classes = config["model"]["num_classes"]
+    confusion_matrix = ConfusionMatrix(num_classes=num_classes, task='multiclass')
+
+    # Evaluate model
+    all_preds = []
+    all_labels = []
+
     with torch.inference_mode():
         for batch, (images, y_true) in enumerate(tqdm(test_loader)):
             y_true = y_true.to(dev)
@@ -68,6 +78,18 @@ def evaluate(config_path):
             _, predicted = torch.max(y_pred, 1)
             total += y_true.size(0)
             correct += (predicted == y_true).sum().item()
+            all_preds.append(predicted.cpu())
+            all_labels.append(y_true.cpu())
+    
+    all_preds = torch.cat(all_preds)
+    all_labels = torch.cat(all_labels)
+
+    confusion_matrix.update(all_preds, all_labels)
+    confusion_matrix = confusion_matrix.compute()
+    fig, ax = plot_confusion_matrix(confusion_matrix.numpy(), figsize=(10, 10))
+
+    #show confusion matrix
+    plt.show()
 
     test_loss = test_loss / len(test_loader)
     test_accuracy = 100 * correct / total

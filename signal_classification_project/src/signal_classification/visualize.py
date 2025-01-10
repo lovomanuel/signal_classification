@@ -52,8 +52,6 @@ classes = { 0:'Speed limit (20km/h)',
             41:'End of no passing', 
             42:'End no passing veh > 3.5 tons' }
 
-
-
 def show_images(loader, classes= classes):
     #take a random loader 
     random_batch_idx = random.randint(0, len(loader)-1)
