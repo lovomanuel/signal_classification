@@ -143,3 +143,7 @@ def show_predictions(config_path, classes=classes):
 
     plt.tight_layout()
     plt.show()
+
+if __name__ == "__main__":
+    show_predictions("configs/modelv0_param1.yaml")
+

@@ -60,7 +60,6 @@ def evaluate(config_path):
     total = 0
 
     num_classes = config["model"]["num_classes"]
-    confusion_matrix = ConfusionMatrix(num_classes=num_classes, task='multiclass')
 
     # Evaluate model
     all_preds = []
@@ -84,18 +83,20 @@ def evaluate(config_path):
     all_preds = torch.cat(all_preds)
     all_labels = torch.cat(all_labels)
 
-    confusion_matrix.update(all_preds, all_labels)
-    confusion_matrix = confusion_matrix.compute()
-    fig, ax = plot_confusion_matrix(confusion_matrix.numpy(), figsize=(10, 10))
-
-    #show confusion matrix
-    plt.show()
-
     test_loss = test_loss / len(test_loader)
     test_accuracy = 100 * correct / total
 
-    return {"model_name": model.__class__.__name__, # only works when model was created with a class
+    results = {"model_name": model.__class__.__name__, # only works when model was created with a class
             "model_loss": test_loss,
             "model_acc": test_accuracy}
+    
+    print(f"Model: {results['model_name']}")
+    print(f"Loss: {results['model_loss']}")
+    print(f"Accuracy: {results['model_acc']}")
+
+if __name__ == "__main__":
+    evaluate("configs/modelv0_param1.yaml")
+
+
 
 

@@ -93,7 +93,7 @@ def save_processed_data(loader, output_path, split):
         torch.save((img, label), file_path)
     print(f"Saved {split} data to {split_path}")
 
-    
+
 # Main function to get DataLoaders
 def get_data_loaders(config_path: str, original: bool = False):
     config = load_config(config_path)
@@ -161,6 +161,7 @@ def get_data_loaders(config_path: str, original: bool = False):
 #The labels are returned as a tensor of shape (batch_size, _)
 
 #sistema questa funzione per mostrare le immagini
+
 
 
 

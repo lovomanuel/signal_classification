@@ -114,6 +114,9 @@ def train(config_path):
     
     print("Training complete!")
 
+if __name__ == "__main__":
+    train("configs/modelv0_param1.yaml")
+
 
 
     
