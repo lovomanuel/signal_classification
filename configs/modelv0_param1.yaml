@@ -1,7 +1,8 @@
 data:
-  use_processed: true  # Set to true to use preprocessed data
+  use_processed: false  # Set to true to use preprocessed data
+  save_processed: false  # Set to true to save processed data
   processed_path: "data/processed/"
-  raw_path: "data/raw/gtsrb/GTSRB/"
+  raw_path: "data/raw/" 
   batch_size: 32
   split_percentage: 0.8
   num_workers: 4

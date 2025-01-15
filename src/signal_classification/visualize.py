@@ -55,30 +55,7 @@ classes = {
     42: 'End no passing veh > 3.5 tons'
 }
 
-def show_images(loader, classes=classes):
-    """
-    Display random images from the dataset with their labels.
 
-    Args:
-        loader (DataLoader): DataLoader object for the dataset.
-        classes (dict): Mapping of class indices to human-readable labels.
-    """
-    random_batch_idx = random.randint(0, len(loader) - 1)
-    random_batch = list(loader)[random_batch_idx]
-    images, labels = random_batch
-
-    fig = plt.figure(figsize=(9, 9))
-    fig.suptitle('Random Images from the Dataset', fontsize=16)
-    rows, cols = 4, 4
-    for idx in range(rows * cols):
-        random_idx = torch.randint(0, len(loader.dataset), size=[1]).item()
-        img, label = loader.dataset[random_idx]
-        ax = fig.add_subplot(rows, cols, idx + 1)
-        ax.imshow(img.permute(1, 2, 0))  # Convert image from CxHxW to HxWxC
-        ax.set_title(classes[label.item()])
-        ax.axis('off')
-    plt.tight_layout()
-    plt.show()
 
 def show_predictions(config_path, classes=classes):
     """
