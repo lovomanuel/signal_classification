@@ -7,146 +7,324 @@ import matplotlib.pyplot as plt
 import os
 from PIL import Image
 from config import load_config
+import requests
+import logging
+import zipfile
+import shutil
 
-##aggiungi funzione iniziale per scaricare il dataset se non già scaricato
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-#capisci se devi salvare il file modificato o no
+def download_data():
+    """
+    Download and extract the GTSRB training, test, and ground truth datasets.
 
-class GTSRBDatasetRaw(Dataset): #class with inheritance from Dataset class
-    def __init__(self, root: str, split: str, transform=None): #constructor: root is the path to the dataset, split is the split of the dataset (train or test)
+    Downloads the datasets from specified URLs, extracts the contents, organizes
+    the folder structure, and removes the downloaded ZIP files after extraction.
+
+    The datasets are organized as follows:
+    - Training data is saved in "data/raw/Training".
+    - Test data is saved in "data/raw/Test/Images".
+    - Ground truth data is extracted into "data/raw/Test/Images".
+
+    Logs progress during each step.
+    """
+    training_url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Training_Images.zip"
+    test_url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Test_Images.zip"
+    ground_truth_url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Test_GT.zip"
+
+    training_path = "data/raw/Training"
+    test_path = "data/raw/Test"
+
+    training_file = os.path.join(training_path, "Training.zip")
+    test_file = os.path.join(test_path, "Test.zip")
+    ground_truth_file = os.path.join(test_path, "Ground_Truth.zip")
+
+    os.makedirs(training_path, exist_ok=True)
+    os.makedirs(test_path, exist_ok=True)
+
+    # Download training data
+    logger.info("Downloading training data...")
+    response = requests.get(training_url, stream=True)
+    with open(training_file, 'wb') as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                file.write(chunk)
+    logger.info("Training data downloaded.")
+
+    # Download test data
+    logger.info("Downloading test data...")
+    response = requests.get(test_url, stream=True)
+    with open(test_file, 'wb') as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                file.write(chunk)
+    logger.info("Test data downloaded.")
+
+    # Download ground truth data
+    logger.info("Downloading ground truth data...")
+    response = requests.get(ground_truth_url, stream=True)
+    with open(ground_truth_file, 'wb') as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                file.write(chunk)
+    logger.info("Ground truth data downloaded.")
+
+    # Extract training data
+    logger.info("Extracting training data...")
+    with zipfile.ZipFile(training_file, 'r') as zip_ref:
+        zip_ref.extractall(training_path)
+
+    extracted_folder_training = os.path.join(training_path, "GTSRB")  # Assuming this is the extracted root folder
+    images_folder_training = os.path.join(extracted_folder_training, "Final_Training", "Images")
+
+    if not os.path.exists(training_path):
+        os.makedirs(training_path)
+    shutil.move(images_folder_training, training_path)
+    logger.info(f"Training data extracted to '{training_path}' folder.")
+    shutil.rmtree(extracted_folder_training)  # Remove the extracted root folder
+    os.remove(training_file)  # Remove the ZIP file
+
+    # Extract test data
+    logger.info("Extracting test data...")
+    with zipfile.ZipFile(test_file, 'r') as zip_ref:
+        zip_ref.extractall(test_path)
+
+    extracted_folder_test = os.path.join(test_path, "GTSRB")  # Assuming this is the extracted root folder
+    images_folder_test = os.path.join(extracted_folder_test, "Final_Test", "Images")
+
+    if not os.path.exists(test_path):
+        os.makedirs(test_path)
+    shutil.move(images_folder_test, test_path)
+    logger.info(f"Test data extracted to '{test_path}' folder.")
+    shutil.rmtree(extracted_folder_test)  # Remove the extracted root folder
+    os.remove(test_file)  # Remove the ZIP file
+
+    # Extract ground truth data
+    logger.info("Extracting ground truth data...")
+    with zipfile.ZipFile(ground_truth_file, 'r') as zip_ref:
+        zip_ref.extractall(os.path.join(test_path, "Images"))
+
+    os.remove(ground_truth_file)  # Remove the ZIP file
+    logger.info(f"Ground truth data extracted to '{os.path.join(test_path, 'Images')}' folder.")
+
+    logger.info("Data download and extraction complete.")
+
+def assert_data():
+    """
+    Verify that the required dataset directories exist. If not, trigger the data download process.
+
+    Checks for the presence of the "data/raw/Training" and "data/raw/Test" directories. If either
+    directory is missing, it calls the `download_data` function to download and set up the datasets.
+
+    Logs the status of the dataset directories.
+    """
+    training_path = "data/raw/Training"
+    test_path = "data/raw/Test"
+    if not os.path.exists(training_path) or not os.path.exists(test_path):
+        logger.info("Data directories not found. Downloading data...")
+        download_data()
+    else:
+        logger.info("Data directories found.")
+
+
+
+
+class GTSRBDatasetRaw(Dataset):
+    """
+    Custom Dataset class for loading raw GTSRB data.
+
+    Args:
+        root (str): Path to the dataset root directory.
+        split (str): Dataset split, one of "train", "test", or "val".
+        transform (callable, optional): Transformations to apply to the images.
+
+    Raises:
+        ValueError: If the split is not "train", "test", or "val".
+    """
+    def __init__(self, root: str, split: str, transform=None):
         if split not in ['train', 'test', 'val']:
-            raise ValueError('split must be either "train" or "test" or "val"')
+            raise ValueError('split must be either "train", "test", or "val"')
         self.root = root 
         self.split = split
         self.transform = transform
 
+        # Define the base folder based on the dataset split.
         base_folder = 'Training' if split == 'train' else 'Final_Test/Images'
         self.labels = []
         self.data = []
 
-        #path to directory containing the dataset
+        # Path to the directory containing the dataset.
         split_path = os.path.join(root, base_folder)
         if split == 'train':
-            for subfolder in os.listdir(split_path): #for each subfolder in the directory
+            for subfolder in os.listdir(split_path):  # Iterate through subfolders.
                 subfolder_path = os.path.join(split_path, subfolder)
-                if os.path.isdir(subfolder_path):  # Check if it's a directory
-                    label = subfolder[-2:]  # Get the label from the folder name
-                    self.labels.append(label) # Append the label to the labels list
-                    for img_name in os.listdir(subfolder_path):
-                        if img_name.endswith('.ppm'):
+                if os.path.isdir(subfolder_path):  # Check if it is a directory.
+                    label = subfolder[-2:]  # Extract the label from the folder name.
+                    self.labels.append(label)  # Append the label to the list.
+                    for img_name in os.listdir(subfolder_path):  # Iterate through image files.
+                        if img_name.endswith('.ppm'):  # Only process .ppm files.
                             img_path = os.path.join(subfolder_path, img_name)
-                            self.data.append((img_path, label)) # Append the image path and label to the data list
-            #I could can include the part of opening image and transforming here but there could be some problems:
-            #for example, by using getitem, I can open the image and transform it only when I need it, not before
-            #this is useful when the dataset is too big and I don't want to load all the images at once
-            #moreover, dataloader can load the images in parallel, speeding up the process
+                            self.data.append((img_path, label))  # Append (image path, label) tuple.
         if split == 'test':
+            # Load test data and labels from CSV file.
             gt_path = os.path.join(split_path, 'GT-final_test.csv')
             with open(gt_path, 'r') as f:
-                next(f)
+                next(f)  # Skip the header row.
                 for line in f:
-                    #Filename;Width;Height;Roi.X1;Roi.Y1;Roi.X2;Roi.Y2;ClassId
+                    # CSV format: Filename;Width;Height;Roi.X1;Roi.Y1;Roi.X2;Roi.Y2;ClassId
                     img_name, _, _, _, _, _, _, label = line.strip().split(';')
                     img_path = os.path.join(split_path, img_name)
                     self.data.append((img_path, label))
         
     def __len__(self):
+        """
+        Returns the size of the dataset.
+
+        Returns:
+            int: Number of samples in the dataset.
+        """
         return len(self.data)
     
     def __getitem__(self, idx):
+        """
+        Fetch a sample (image, label) from the dataset.
+
+        Args:
+            idx (int): Index of the sample.
+
+        Returns:
+            Tuple[Tensor, Tensor]: Transformed image and its label.
+        """
         img_path, label = self.data[idx]
-        img = Image.open(img_path) #The function Image.open() opens an image file from the specified file path (img_path) and creates an instance of PIL.Image.Image, which provides methods and attributes to manipulate the image (e.g., resizing, cropping, and format conversion). It does not load the entire image into memory immediately but instead opens a file pointer to access the image data. This deferred loading means the image is only fully read into memory when operations are performed or when it is converted to another format.
+        img = Image.open(img_path)  # Open the image.
         if self.transform:
-            img = self.transform(img)
-        label = torch.tensor(int(label), dtype=torch.long) 
+            img = self.transform(img)  # Apply transformations.
+        label = torch.tensor(int(label), dtype=torch.long)  # Convert label to tensor.
         return img, label
     
+
 class GTSRBDatasetProcessed(Dataset):
+    """
+    Custom Dataset class for loading preprocessed GTSRB data saved as .pt files.
+
+    Args:
+        processed_path (str): Path to the directory containing processed data.
+        split (str): Dataset split, one of "train", "test", or "val".
+
+    Raises:
+        ValueError: If the split is not "train", "test", or "val".
+    """
     def __init__(self, processed_path: str, split: str):
         if split not in ['train', 'test', 'val']:
-            raise ValueError('split must be either "train" or "test" or "val"')
+            raise ValueError('split must be either "train", "test", or "val"')
         self.processed_path = processed_path
         self.split = split
         self.data = []
+
+        # Load preprocessed files from the split directory.
         split_path = os.path.join(processed_path, split)
         for file in os.listdir(split_path):
-            if file.endswith('.pt'):
+            if file.endswith('.pt'):  # Only process .pt files.
                 file_path = os.path.join(split_path, file)
                 self.data.append(file_path)
     
     def __len__(self):
+        """
+        Returns the size of the dataset.
+
+        Returns:
+            int: Number of samples in the dataset.
+        """
         return len(self.data)
 
     def __getitem__(self, idx):
+        """
+        Fetch a preprocessed sample (image, label) from the dataset.
+
+        Args:
+            idx (int): Index of the sample.
+
+        Returns:
+            Tuple[Tensor, Tensor]: Image and its label loaded from .pt file.
+        """
         file_path = self.data[idx]
         img, label = torch.load(file_path, weights_only=True)
         return img, label
     
-# Save preprocessed data to disk
+
 def save_processed_data(loader, output_path, split):
+    """
+    Save preprocessed data to disk.
+
+    Args:
+        loader (DataLoader): DataLoader containing the samples to save.
+        output_path (str): Directory to save the processed data.
+        split (str): Dataset split name (e.g., "train", "val", "test").
+    """
     split_path = os.path.join(output_path, split)
-    os.makedirs(split_path, exist_ok=True)
+    os.makedirs(split_path, exist_ok=True)  # Create the directory if it does not exist.
     for idx, (img, label) in enumerate(loader):
-        img = img.squeeze(0)
+        img = img.squeeze(0)  # Remove batch dimension.
         label = label.squeeze(0)
         file_path = os.path.join(split_path, f"{split}_img_{idx}.pt")
-        torch.save((img, label), file_path)
+        torch.save((img, label), file_path)  # Save image and label as .pt file.
     print(f"Saved {split} data to {split_path}")
 
 
-# Main function to get DataLoaders
 def get_data_loaders(config_path: str, original: bool = False):
+    """
+    Load and preprocess GTSRB dataset, returning PyTorch DataLoaders.
+
+    Args:
+        config_path (str): Path to the configuration file.
+        original (bool, optional): Whether to use raw data (default: False).
+
+    Returns:
+        Tuple[DataLoader, DataLoader, DataLoader]: Train, validation, and test DataLoaders.
+    """
     config = load_config(config_path)
     use_processed = config["data"]["use_processed"]
     print(use_processed)
     print(original)
 
     if use_processed and not original:
+        # Load preprocessed data.
         print("Loading preprocessed data...")
         train_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "train")
         val_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "val")
         test_data = GTSRBDatasetProcessed(config["data"]["processed_path"], "test")
-
     else:
+        # Process raw data.
         print("Processing raw data...")
-
-        if original == True:
+        if original:
             print("Using original data...")
-            # Define transformations
             transforms = Compose([
                 Resize(tuple(config["transforms"]["resize"])),
                 ToTensor()
             ])
-            train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
-            test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
-            
-            # Train/Validation Split
-            train_size = int(config["data"]["split_percentage"] * len(train_data))
-            val_size = len(train_data) - train_size
-            train_data, val_data = random_split(train_data, [train_size, val_size])
         else:
             print("Using augmented data...")
-            # Define transformations
             transforms = Compose([
                 Resize(tuple(config["transforms"]["resize"])),
                 RandomRotation(degrees=config["transforms"]["rotation"]),
                 RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
                 ToTensor()
             ])
-            train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
-            test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
 
-            # Train/Validation Split
-            train_size = int(config["data"]["split_percentage"] * len(train_data))
-            val_size = len(train_data) - train_size
-            train_data, val_data = random_split(train_data, [train_size, val_size])
+        train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
+        test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
 
-            # Save preprocessed data if needed
-            save_processed_data(DataLoader(train_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "train")
-            save_processed_data(DataLoader(val_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "val")
-            save_processed_data(DataLoader(test_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "test")
+        train_size = int(config["data"]["split_percentage"] * len(train_data))
+        val_size = len(train_data) - train_size
+        train_data, val_data = random_split(train_data, [train_size, val_size])
 
-    # Create DataLoaders
+        # Save preprocessed data.
+        save_processed_data(DataLoader(train_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "train")
+        save_processed_data(DataLoader(val_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "val")
+        save_processed_data(DataLoader(test_data, batch_size=1, shuffle=False), config["data"]["processed_path"], "test")
+
+    # Create DataLoaders.
     batch_size = config["data"]["batch_size"]
     num_workers = config["data"]["num_workers"]
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
@@ -156,18 +334,5 @@ def get_data_loaders(config_path: str, original: bool = False):
     return train_loader, val_loader, test_loader
 
 
-#A DataLoader in PyTorch is an iterator that allows you to iterate over the dataset in batches, making it efficient for training and evaluation. For each iteration, it retrieves a batch of images and labels, both in the form of tensors.
-#The images are returned as a tensor of shape (batch_size, channels, height, width)
-#The labels are returned as a tensor of shape (batch_size, _)
-
-#sistema questa funzione per mostrare le immagini
-
-
-
-
-
-
-
-
-
-
+if __name__ == "__main__":
+    download_data()
