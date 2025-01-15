@@ -9,7 +9,18 @@ from config import load_config
 from helper import get_device
 import os
 import argparse
+import logging
+import wandb
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 def get_loss_function(loss_name):
     """
@@ -30,7 +41,6 @@ def get_loss_function(loss_name):
         return nn.MSELoss()
     else:
         raise ValueError(f"Loss function '{loss_name}' not supported.")
-
 
 def get_optimizer(optimizer_name, model_parameters, learning_rate):
     """
@@ -54,7 +64,6 @@ def get_optimizer(optimizer_name, model_parameters, learning_rate):
     else:
         raise ValueError(f"Optimizer '{optimizer_name}' not supported.")
 
-
 def train(config_path):
     """
     Train a model based on the configuration file.
@@ -69,6 +78,7 @@ def train(config_path):
     """
     # Load configuration and data loaders.
     config = load_config(config_path)
+    logger.info("Loaded configuration from %s", config_path)
     train_loader, val_loader, _ = dataLoader(config_path)
 
     # Initialize the model.
@@ -84,7 +94,6 @@ def train(config_path):
             dropout=config["model"]["dropout"],
         )
     elif model_name == "LinearMLP":
-        # Determine input features based on data sample dimensions.
         image = next(iter(train_loader))[0]
         input_features = image.shape[1] * image.shape[2] * image.shape[3]
         model = LinearMLP(
@@ -93,7 +102,6 @@ def train(config_path):
             num_classes=config["model"]["num_classes"],
         )
     elif model_name == "NonLinearMLP":
-        # Determine input features based on data sample dimensions.
         image = next(iter(train_loader))[0]
         input_features = image.shape[1] * image.shape[2] * image.shape[3]
         model = NonLinearMLP(
@@ -105,9 +113,13 @@ def train(config_path):
     else:
         raise ValueError("Unsupported model name")
 
+    logger.info("Initialized %s model", model_name)
+
+    wandb.init(project="signal-classification", config={"model": model_name, "optimizer": opt, "loss": los, "lr": config["training"]["lr"], "epochs": config["training"]["epochs"]})
+
     # Prepare the device and model saving path.
-    dev = get_device()  # Get CPU or GPU.
-    model.to(dev)  # Move model to the device.
+    dev = get_device()
+    model.to(dev)
     path = config["training"]["model_path"]
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -119,68 +131,86 @@ def train(config_path):
     optimizer = get_optimizer(opt, model.parameters(), config["training"]["lr"])
     loss_function = get_loss_function(los)
     min_val_loss = float("inf")
+    best_model_path = None
+    max_val_accuracy = 0
 
     # Training loop.
+    # Training loop
     for epoch in range(config["training"]["epochs"]):
-        print(f"Epoch: {epoch}\n-------")
-        save_path = os.path.join(
-            path,
-            f"{config['model']['name']}_hidden{config['model']['hidden_dim']}_lr{config['training']['lr']}_epoch{epoch}.pth",
-        )
-
-        ### Training
-        model.train()  # Ensure the model is in training mode.
+        logger.info("Starting epoch %d", epoch)
+        model.train()
         train_loss = 0
-        for batch, (images, y_true) in enumerate(tqdm(train_loader)):
-            images, y_true = images.to(dev), y_true.to(dev)  # Move data to device.
-            optimizer.zero_grad()  # Reset gradients.
-            y_pred = model(images)  # Forward pass.
-            loss = loss_function(y_pred, y_true)  # Compute loss.
-            loss.backward()  # Backward pass.
-            optimizer.step()  # Update weights.
-            train_loss += loss.item()  # Accumulate training loss.
 
-        train_loss /= len(train_loader)  # Average training loss.
-        print(f"Train loss: {train_loss}")
+        for batch, (images, y_true) in enumerate(tqdm(train_loader)):
+            images, y_true = images.to(dev), y_true.to(dev)
+            optimizer.zero_grad()
+            y_pred = model(images)
+            loss = loss_function(y_pred, y_true)
+            loss.backward()
+
+            optimizer.step()
+            train_loss += loss.item()
+
+        train_loss /= len(train_loader)
+        logger.info("Epoch %d: Train loss = %.4f", epoch, train_loss)
 
         ### Validation
-        model.eval()  # Set the model to evaluation mode.
+        model.eval()
         val_loss = 0
         correct = 0
         total = 0
 
-        with torch.no_grad():  # Disable gradients for validation.
+        with torch.no_grad():
             for batch, (images, y_true) in enumerate(tqdm(val_loader)):
-                images, y_true = images.to(dev), y_true.to(dev)  # Move data to device.
-                y_pred = model(images)  # Forward pass.
-                loss = loss_function(y_pred, y_true)  # Compute loss.
-                val_loss += loss.item()  # Accumulate validation loss.
+                images, y_true = images.to(dev), y_true.to(dev)
+                y_pred = model(images)
+                loss = loss_function(y_pred, y_true)
+                val_loss += loss.item()
 
-                # Calculate accuracy.
                 _, predicted = torch.max(y_pred, 1)
                 total += y_true.size(0)
                 correct += (predicted == y_true).sum().item()
 
-        val_loss /= len(val_loader)  # Average validation loss.
-        val_accuracy = 100 * correct / total  # Calculate accuracy percentage.
+        val_loss /= len(val_loader)
+        val_accuracy = 100 * correct / total
 
-        # Save the model if validation loss improves.
-        if val_loss < min_val_loss and config["training"]["save_model"]:
-            print(f"Validation loss decreased from {min_val_loss:.4f} to {val_loss:.4f}. Saving model to {save_path}")
+        # Log metrics to WandB
+        wandb.log({
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "val_accuracy": val_accuracy
+        })
+
+        # Save the best model
+        if val_loss < min_val_loss:
+            logger.info(
+                "Validation loss improved from %.4f to %.4f. Saving model to %s",
+                min_val_loss,
+                val_loss,
+                path,
+            )
             min_val_loss = val_loss
-            # elimina il precedente contenuto della cartella
+            best_model_path = os.path.join(
+                path,
+                f"{model_name}_epoch{epoch}_val_loss{val_loss:.4f}.pth"
+            )
             for f in os.listdir(path):
                 os.remove(os.path.join(path, f))
-            torch.save(model.state_dict(), save_path)
+            torch.save(model.state_dict(), best_model_path)
+        
+        if val_accuracy > max_val_accuracy:
+            max_val_accuracy = val_accuracy
 
-        print(f"Validation accuracy: {val_accuracy:.2f}%")
-        print("\n")
+    # Upload best model to WandB as an artifact
+    if best_model_path:
+        name_of_the_model = "Best_model" + str(config["model"]["name"])
+        artifact = wandb.Artifact(name_of_the_model, type="model", metadata={"accuracy": max_val_accuracy, "loss": min_val_loss})
+        artifact.add_file(best_model_path)
+        wandb.log_artifact(artifact)
 
-    print("Training complete!")
-
+    logger.info("Training complete!")
 
 if __name__ == "__main__":
-    # Entry point for script execution.
     parser = argparse.ArgumentParser(description="Train a model for signal classification.")
     parser.add_argument("--config", type=str, help="Path to the configuration file.")
     args = parser.parse_args()

@@ -80,6 +80,21 @@ def evaluate_CNN(ctx: Context) -> None:
     ctx.run(f"python src/{PROJECT_NAME}/evaluate.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
 
 @task
+def show_predictions_LinearMLP(ctx: Context) -> None:
+    """Show predictions for LinearMLP model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/visualize.py --config configs/models/modelv0_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def show_predictions_NonLinearMLP(ctx: Context) -> None:
+    """Show predictions for NonLinearMLP model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/visualize.py --config configs/models/modelv1_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def show_predictions_CNN(ctx: Context) -> None:
+    """Show predictions for CNN model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/visualize.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
 def test(ctx: Context) -> None:
     """Run tests."""
     ctx.run("coverage run -m pytest tests/", echo=True, pty=not WINDOWS)

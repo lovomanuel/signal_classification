@@ -3,6 +3,17 @@ from config import load_config
 import os
 import torch
 import argparse
+import logging
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 class LinearMLP(nn.Module):
     """
@@ -132,6 +143,7 @@ def model(config_path):
         None: Prints the model architecture and parameter count.
     """
     config = load_config(config_path)
+    logger.info("Loaded configuration from %s", config_path)
     model_name = config["model"]["name"]
     PATH = "data/processed/"
 
@@ -165,15 +177,15 @@ def model(config_path):
             dropout=config["model"]["dropout"],
         )
     else:
+        logger.error("Unsupported model name: %s", model_name)
         raise ValueError("Unsupported model name")
 
-    # Print model details.
-    print(f"Model architecture: {model}")
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
+    # Log model details.
+    logger.info("Model architecture: %s", model)
+    logger.info("Model parameters: %d", sum(p.numel() for p in model.parameters()))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True, help="Path to the configuration file.")
     args = parser.parse_args()
     model(args.config)
-    

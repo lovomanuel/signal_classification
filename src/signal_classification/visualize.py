@@ -1,12 +1,24 @@
-import random
 import torch
 import matplotlib.pyplot as plt
 from config import load_config
-from data import get_data_loaders
 from model import LinearMLP, NonLinearMLP, CNN
 from helper import get_device
 import os
-from torchvision.transforms import Compose, RandomRotation, RandomHorizontalFlip
+from torchvision.transforms import Compose, RandomRotation, RandomHorizontalFlip, Resize, ToTensor
+from data import GTSRBDatasetRaw
+import argparse
+import random
+import logging
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 # Mapping of class indices to human-readable labels
 classes = {
@@ -55,7 +67,6 @@ classes = {
     42: "End no passing veh > 3.5 tons",
 }
 
-
 def show_predictions(config_path, classes=classes):
     """
     Display predictions of the model alongside true labels.
@@ -64,28 +75,38 @@ def show_predictions(config_path, classes=classes):
         config_path (str): Path to the configuration YAML file.
         classes (dict): Mapping of class indices to human-readable labels.
     """
+    logger.info("Loading configuration from %s", config_path)
     config = load_config(config_path)
 
-    # Load original data loader (unmodified images)
-    _, _, test_loader_original = get_data_loaders(config_path, original=True)
+    logger.info("Initializing dataset and transformations")
+    test_dataset = GTSRBDatasetRaw("data/raw/", "test", Compose([Resize(config["transforms"]["resize"]), ToTensor()]))
 
-    # Load transformations for prediction
+    original_images = []
+    true_labels = []
+    transformed_images = []
+    predicted_label = []
+
     transforms = Compose(
         [
             RandomRotation(degrees=config["transforms"]["rotation"]),
             RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
         ]
     )
+    random_indices = random.sample(range(0, len(test_dataset)), config["data"]["batch_size"])
 
-    # Random batch from the original data loader
-    random_batch_idx = random.randint(0, len(test_loader_original) - 1)
-    random_batch_original = list(test_loader_original)[random_batch_idx]
-    original_images, labels = random_batch_original
+    logger.info("Applying transformations to sample images")
+    for i in range(0, config["data"]["batch_size"]):
+        numb = random_indices[i]
+        original_images.append(test_dataset[numb][0])
+        transformed_image = transforms(test_dataset[numb][0])
+        transformed_images.append(transformed_image)
+        true_labels.append(test_dataset[numb][1])
 
     # Initialize model
     model_name = config["model"]["name"]
     path = config["training"]["model_path"]
 
+    logger.info("Initializing the %s model", model_name)
     if model_name == "CNN":
         model = CNN(
             input_features=config["model"]["in_channels"],
@@ -109,35 +130,36 @@ def show_predictions(config_path, classes=classes):
             dropout=config["model"]["dropout"],
         )
     else:
+        logger.error("Unsupported model name: %s", model_name)
         raise ValueError("Unsupported model name")
 
     # Load model weights
     if not os.path.exists(path) or not any(f.endswith(".pth") for f in os.listdir(path)):
+        logger.error("Model file does not exist in path: %s", path)
         raise ValueError("Model does not exist")
-    model.load_state_dict(torch.load(os.path.join(path, os.listdir(path)[-1]), weights_only=True))
+    model_file = os.path.join(path, os.listdir(path)[-1])
+    logger.info("Loading model weights from %s", model_file)
+    model.load_state_dict(torch.load(model_file, weights_only=True))
     model.to(get_device())
     model.eval()
 
-    # Generate predictions
-    test_labels_pred = []
-    transformed_images = []
-
+    logger.info("Generating predictions")
     with torch.inference_mode():
-        for img in original_images:
-            transformed_img = transforms(img)
-            transformed_images.append(transformed_img)
-            img = transformed_img.unsqueeze(0).to(get_device())
-            pred = model(img)
-            _, predicted_label = torch.max(pred, 1)
-            test_labels_pred.append(predicted_label.item())
+        for img in transformed_images:
+            img = img.unsqueeze(0)
+            img = img.to(get_device())
+            output = model(img)
+            _, pred = torch.max(output, 1)
+            predicted_label.append(pred.item())
 
     # Plot original images with predictions
+    logger.info("Plotting predictions")
     fig = plt.figure(figsize=(9, 9))
     rows, cols = 3, 3
     for idx in range(rows * cols):
         orig_img = original_images[idx]
-        label = classes[test_labels_pred[idx]]
-        true_label = classes[labels[idx].item()]
+        label = classes[predicted_label[idx]]
+        true_label = classes[true_labels[idx].item()]
         title_text = f"Pred: {label} | Truth: {true_label}"
 
         ax = fig.add_subplot(rows, cols, idx + 1)
@@ -150,3 +172,11 @@ def show_predictions(config_path, classes=classes):
 
     plt.tight_layout()
     plt.show()
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, required=True, help="Path to the configuration file.")
+    args = parser.parse_args()
+    config_path = args.config
+    show_predictions(config_path)

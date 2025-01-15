@@ -1,0 +1,6 @@
+transforms:
+  resize: [32, 32]
+  rotation: 15
+  horizontal_flip: 0.5
+  processed_path: "data/processed/"
+  raw_path: "data/raw/" 
