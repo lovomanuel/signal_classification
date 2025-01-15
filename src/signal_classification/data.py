@@ -1,7 +1,6 @@
 import torch
-from torchvision.transforms import Compose, ToTensor, Resize, RandomRotation, RandomHorizontalFlip, ColorJitter, Normalize
+from torchvision.transforms import Compose, ToTensor, Resize, RandomRotation, RandomHorizontalFlip
 from torch.utils.data import DataLoader
-from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset, random_split
 import matplotlib.pyplot as plt
 import os
@@ -17,6 +16,7 @@ import random
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def download_data():
     """
     Download and extract the GTSRB training, test, and ground truth datasets.
@@ -31,7 +31,9 @@ def download_data():
 
     Logs progress during each step.
     """
-    training_url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Training_Images.zip"
+    training_url = (
+        "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Training_Images.zip"
+    )
     test_url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Test_Images.zip"
     ground_truth_url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Test_GT.zip"
 
@@ -48,7 +50,7 @@ def download_data():
     # Download training data
     logger.info("Downloading training data...")
     response = requests.get(training_url, stream=True)
-    with open(training_file, 'wb') as file:
+    with open(training_file, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 file.write(chunk)
@@ -57,7 +59,7 @@ def download_data():
     # Download test data
     logger.info("Downloading test data...")
     response = requests.get(test_url, stream=True)
-    with open(test_file, 'wb') as file:
+    with open(test_file, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 file.write(chunk)
@@ -66,7 +68,7 @@ def download_data():
     # Download ground truth data
     logger.info("Downloading ground truth data...")
     response = requests.get(ground_truth_url, stream=True)
-    with open(ground_truth_file, 'wb') as file:
+    with open(ground_truth_file, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 file.write(chunk)
@@ -74,7 +76,7 @@ def download_data():
 
     # Extract training data
     logger.info("Extracting training data...")
-    with zipfile.ZipFile(training_file, 'r') as zip_ref:
+    with zipfile.ZipFile(training_file, "r") as zip_ref:
         zip_ref.extractall(training_path)
 
     extracted_folder_training = os.path.join(training_path, "GTSRB")  # Assuming this is the extracted root folder
@@ -89,7 +91,7 @@ def download_data():
 
     # Extract test data
     logger.info("Extracting test data...")
-    with zipfile.ZipFile(test_file, 'r') as zip_ref:
+    with zipfile.ZipFile(test_file, "r") as zip_ref:
         zip_ref.extractall(test_path)
 
     extracted_folder_test = os.path.join(test_path, "GTSRB")  # Assuming this is the extracted root folder
@@ -104,13 +106,14 @@ def download_data():
 
     # Extract ground truth data
     logger.info("Extracting ground truth data...")
-    with zipfile.ZipFile(ground_truth_file, 'r') as zip_ref:
+    with zipfile.ZipFile(ground_truth_file, "r") as zip_ref:
         zip_ref.extractall(os.path.join(test_path, "Images"))
 
     os.remove(ground_truth_file)  # Remove the ZIP file
     logger.info(f"Ground truth data extracted to '{os.path.join(test_path, 'Images')}' folder.")
 
     logger.info("Data download and extraction complete.")
+
 
 def assert_data():
     """
@@ -142,41 +145,42 @@ class GTSRBDatasetRaw(Dataset):
     Raises:
         ValueError: If the split is not "train", "test".
     """
+
     def __init__(self, root: str, split: str, transform=None):
-        if split not in ['train', 'test']:
+        if split not in ["train", "test"]:
             raise ValueError('split must be either "train", "test"')
-        self.root = root 
+        self.root = root
         self.split = split
         self.transform = transform
 
         # Define the base folder based on the dataset split.
-        base_folder = 'Training/Images' if split == 'train' else 'Test/Images'
+        base_folder = "Training/Images" if split == "train" else "Test/Images"
         self.labels = []
         self.data = []
 
         # Path to the directory containing the dataset.
         split_path = os.path.join(root, base_folder)
-        if split == 'train':
+        if split == "train":
             for subfolder in os.listdir(split_path):  # Iterate through subfolders.
                 subfolder_path = os.path.join(split_path, subfolder)
                 if os.path.isdir(subfolder_path):  # Check if it is a directory.
                     label = subfolder[-2:]  # Extract the label from the folder name.
                     self.labels.append(label)  # Append the label to the list.
                     for img_name in os.listdir(subfolder_path):  # Iterate through image files.
-                        if img_name.endswith('.ppm'):  # Only process .ppm files.
+                        if img_name.endswith(".ppm"):  # Only process .ppm files.
                             img_path = os.path.join(subfolder_path, img_name)
                             self.data.append((img_path, label))  # Append (image path, label) tuple.
-        if split == 'test':
+        if split == "test":
             # Load test data and labels from CSV file.
-            gt_path = os.path.join(split_path, 'GT-final_test.csv')
-            with open(gt_path, 'r') as f:
+            gt_path = os.path.join(split_path, "GT-final_test.csv")
+            with open(gt_path, "r") as f:
                 next(f)  # Skip the header row.
                 for line in f:
                     # CSV format: Filename;Width;Height;Roi.X1;Roi.Y1;Roi.X2;Roi.Y2;ClassId
-                    img_name, _, _, _, _, _, _, label = line.strip().split(';')
+                    img_name, _, _, _, _, _, _, label = line.strip().split(";")
                     img_path = os.path.join(split_path, img_name)
                     self.data.append((img_path, label))
-        
+
     def __len__(self):
         """
         Returns the size of the dataset.
@@ -185,7 +189,7 @@ class GTSRBDatasetRaw(Dataset):
             int: Number of samples in the dataset.
         """
         return len(self.data)
-    
+
     def __getitem__(self, idx):
         """
         Fetch a sample (image, label) from the dataset.
@@ -204,7 +208,8 @@ class GTSRBDatasetRaw(Dataset):
             img = ToTensor()(img)
         label = torch.tensor(int(label), dtype=torch.long)  # Convert label to tensor.
         return img, label
-    
+
+
 def save_processed_data(dataset, output_path, split):
     """
     Save preprocessed data to disk.
@@ -214,9 +219,9 @@ def save_processed_data(dataset, output_path, split):
         output_path (str): Directory to save the processed data.
         split (str): Dataset split name (e.g., "train", "test").
     """
-    if split not in ['train', 'test']:
-            raise ValueError('split must be either "train", "test"')
-    base_folder = 'Training' if split == 'train' else 'Test'
+    if split not in ["train", "test"]:
+        raise ValueError('split must be either "train", "test"')
+    base_folder = "Training" if split == "train" else "Test"
     split_path = os.path.join(output_path, base_folder)
     os.makedirs(split_path, exist_ok=True)  # Create the directory if it does not exist.
     logger.info(f"Saving {base_folder} data to '{split_path}' folder...")
@@ -224,17 +229,18 @@ def save_processed_data(dataset, output_path, split):
         image, label = dataset[idx]
         label_int = label.item()
 
-        #save as png
+        # save as png
         img_path = os.path.join(split_path, f"{split}_img_{idx}_{label_int}.png")
         if image.shape[0] == 1:  # Grayscale
             image = image.squeeze(0).numpy()  # Remove channel dimension
         else:  # RGB
             image = image.permute(1, 2, 0).numpy()  # Rearrange to (H, W, C)
-        image = (image * 255).astype('uint8')
+        image = (image * 255).astype("uint8")
         image = Image.fromarray(image)
         image.save(img_path)
         logger.debug(f"Saved image {img_path}")
     logger.info(f"Processed {base_folder} data saved to '{split_path}' folder.")
+
 
 class GTSRBDatasetProcessed(Dataset):
     """
@@ -260,21 +266,22 @@ class GTSRBDatasetProcessed(Dataset):
         __len__(): Returns the number of samples in the dataset.
         __getitem__(idx): Fetches the image and its label at the specified index.
     """
+
     def __init__(self, processed_path: str, split: str):
-        if split not in ['train', 'test']:
+        if split not in ["train", "test"]:
             raise ValueError('split must be either "train" or "test"')
         self.processed_path = processed_path
         self.split = split
         self.data = []
-        if split == 'train':
+        if split == "train":
             split_path = os.path.join(processed_path, "Training")
         else:
             split_path = os.path.join(processed_path, "Test")
         for file in os.listdir(split_path):
-            if file.endswith('.png'):  # Only process .png files.
+            if file.endswith(".png"):  # Only process .png files.
                 file_path = os.path.join(split_path, file)
                 self.data.append(file_path)
-    
+
     def __len__(self):
         """
         Returns the size of the dataset.
@@ -301,14 +308,13 @@ class GTSRBDatasetProcessed(Dataset):
                 - Tensor: Label as a long tensor.
         """
         file_path = self.data[idx]
-        label = int(file_path.split('_')[-1].split('.')[0])  # Extract label from filename
+        label = int(file_path.split("_")[-1].split(".")[0])  # Extract label from filename
         img = Image.open(file_path)  # Open the image file
         img = ToTensor()(img)  # Convert the image to a PyTorch tensor
         return img, torch.tensor(label, dtype=torch.long)
 
-    
 
-def dataLoader(config_path: str):
+def dataLoader(config_path: str, save_processed: bool = False):
     """
     Load and preprocess GTSRB dataset, returning PyTorch DataLoaders.
 
@@ -329,16 +335,18 @@ def dataLoader(config_path: str):
     else:
         # Process raw data.
         logger.info("Processing raw data...")
-        transforms = Compose([
-            Resize(tuple(config["transforms"]["resize"])),
-            RandomRotation(degrees=config["transforms"]["rotation"]),
-            RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
-            ToTensor()
-        ])
+        transforms = Compose(
+            [
+                Resize(tuple(config["transforms"]["resize"])),
+                RandomRotation(degrees=config["transforms"]["rotation"]),
+                RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
+                ToTensor(),
+            ]
+        )
 
         train_data = GTSRBDatasetRaw(config["data"]["raw_path"], "train", transform=transforms)
         test_data = GTSRBDatasetRaw(config["data"]["raw_path"], "test", transform=transforms)
-        if config["data"]["save_processed"]:
+        if save_processed:
             save_processed_data(train_data, config["data"]["processed_path"], "train")
             save_processed_data(test_data, config["data"]["processed_path"], "test")
 
@@ -363,6 +371,7 @@ def dataLoader(config_path: str):
 
     return train_loader, val_loader, test_loader
 
+
 def show_images(loader):
     """
     Display random images from the dataset with their labels.
@@ -371,57 +380,57 @@ def show_images(loader):
         loader (DataLoader): DataLoader object for the dataset.
         classes (dict): Mapping of class indices to human-readable labels.
     """
-    classes = { 
-        0: 'Speed limit (20km/h)',
-        1: 'Speed limit (30km/h)', 
-        2: 'Speed limit (50km/h)', 
-        3: 'Speed limit (60km/h)', 
-        4: 'Speed limit (70km/h)', 
-        5: 'Speed limit (80km/h)', 
-        6: 'End of speed limit (80km/h)', 
-        7: 'Speed limit (100km/h)', 
-        8: 'Speed limit (120km/h)', 
-        9: 'No passing', 
-        10: 'No passing veh over 3.5 tons', 
-        11: 'Right-of-way at intersection', 
-        12: 'Priority road', 
-        13: 'Yield', 
-        14: 'Stop', 
-        15: 'No vehicles', 
-        16: 'Veh > 3.5 tons prohibited', 
-        17: 'No entry', 
-        18: 'General caution', 
-        19: 'Dangerous curve left', 
-        20: 'Dangerous curve right', 
-        21: 'Double curve', 
-        22: 'Bumpy road', 
-        23: 'Slippery road', 
-        24: 'Road narrows on the right', 
-        25: 'Road work', 
-        26: 'Traffic signals', 
-        27: 'Pedestrians', 
-        28: 'Children crossing', 
-        29: 'Bicycles crossing', 
-        30: 'Beware of ice/snow',
-        31: 'Wild animals crossing', 
-        32: 'End speed + passing limits', 
-        33: 'Turn right ahead', 
-        34: 'Turn left ahead', 
-        35: 'Ahead only', 
-        36: 'Go straight or right', 
-        37: 'Go straight or left', 
-        38: 'Keep right', 
-        39: 'Keep left', 
-        40: 'Roundabout mandatory', 
-        41: 'End of no passing', 
-        42: 'End no passing veh > 3.5 tons'
+    classes = {
+        0: "Speed limit (20km/h)",
+        1: "Speed limit (30km/h)",
+        2: "Speed limit (50km/h)",
+        3: "Speed limit (60km/h)",
+        4: "Speed limit (70km/h)",
+        5: "Speed limit (80km/h)",
+        6: "End of speed limit (80km/h)",
+        7: "Speed limit (100km/h)",
+        8: "Speed limit (120km/h)",
+        9: "No passing",
+        10: "No passing veh over 3.5 tons",
+        11: "Right-of-way at intersection",
+        12: "Priority road",
+        13: "Yield",
+        14: "Stop",
+        15: "No vehicles",
+        16: "Veh > 3.5 tons prohibited",
+        17: "No entry",
+        18: "General caution",
+        19: "Dangerous curve left",
+        20: "Dangerous curve right",
+        21: "Double curve",
+        22: "Bumpy road",
+        23: "Slippery road",
+        24: "Road narrows on the right",
+        25: "Road work",
+        26: "Traffic signals",
+        27: "Pedestrians",
+        28: "Children crossing",
+        29: "Bicycles crossing",
+        30: "Beware of ice/snow",
+        31: "Wild animals crossing",
+        32: "End speed + passing limits",
+        33: "Turn right ahead",
+        34: "Turn left ahead",
+        35: "Ahead only",
+        36: "Go straight or right",
+        37: "Go straight or left",
+        38: "Keep right",
+        39: "Keep left",
+        40: "Roundabout mandatory",
+        41: "End of no passing",
+        42: "End no passing veh > 3.5 tons",
     }
     random_batch_idx = random.randint(0, len(loader) - 1)
     random_batch = list(loader)[random_batch_idx]
     images, labels = random_batch
 
     fig = plt.figure(figsize=(9, 9))
-    fig.suptitle('Random Images from the Dataset', fontsize=16)
+    fig.suptitle("Random Images from the Dataset", fontsize=16)
     rows, cols = 4, 4
     for idx in range(rows * cols):
         random_idx = torch.randint(0, len(loader.dataset), size=[1]).item()
@@ -429,16 +438,26 @@ def show_images(loader):
         ax = fig.add_subplot(rows, cols, idx + 1)
         ax.imshow(img.permute(1, 2, 0))  # Convert image from CxHxW to HxWxC
         ax.set_title(classes[label.item()])
-        ax.axis('off')
+        ax.axis("off")
     plt.tight_layout()
     plt.show()
 
+def main():
+    assert_data()
+    config_path = "configs/data/data.yaml"
+    config = load_config(config_path)
+    transforms = Compose(
+        [
+            Resize(tuple(config["transforms"]["resize"])),
+            RandomRotation(degrees=config["transforms"]["rotation"]),
+            RandomHorizontalFlip(p=config["transforms"]["horizontal_flip"]),
+            ToTensor(),
+        ]
+    )
+    if not os.path.exists(config["transforms"]["processed_path"]):
+        save_processed_data(GTSRBDatasetRaw(config["transforms"]["raw_path"], "train", transform=transforms), config["transforms"]["processed_path"], "train")
+        save_processed_data(GTSRBDatasetRaw(config["transforms"]["raw_path"], "test", transform=transforms), config["transforms"]["processed_path"], "test")
 
-
-
-    
-
-
-
-
+if __name__ == "__main__":
+    main()
 

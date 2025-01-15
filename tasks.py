@@ -33,12 +33,51 @@ def dev_requirements(ctx: Context) -> None:
 @task
 def preprocess_data(ctx: Context) -> None:
     """Preprocess data."""
-    ctx.run(f"python src/{PROJECT_NAME}/data.py data/raw data/processed", echo=True, pty=not WINDOWS)
+    ctx.run(f"python src/{PROJECT_NAME}/data.py", echo=True, pty=not WINDOWS)
 
 @task
-def train(ctx: Context) -> None:
-    """Train model."""
-    ctx.run(f"python src/{PROJECT_NAME}/train.py", echo=True, pty=not WINDOWS)
+def LinearMLP(ctx: Context) -> None:
+    """Look at the LinearMLP model."""
+    ctx.run(f"python src/{PROJECT_NAME}/model.py --config configs/models/modelv0_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def NonLinearMLP(ctx: Context) -> None:
+    """Look at the NonLinearMLP model."""
+    ctx.run(f"python src/{PROJECT_NAME}/model.py --config configs/models/modelv1_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def CNN(ctx: Context) -> None:
+    """Look at the CNN model."""
+    ctx.run(f"python src/{PROJECT_NAME}/model.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def train_LinearMLP(ctx: Context) -> None:
+    """Train model LinearMLP model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv0_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def train_NonLinearMLP(ctx: Context) -> None:
+    """Train model NonLinearMLP model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv1_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def train_CNN(ctx: Context) -> None:
+    """Train model CNN model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def evaluate_LinearMLP(ctx: Context) -> None:
+    """Evaluate LinearMLP model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/evaluate.py --config configs/models/modelv0_param1.yaml", echo=True, pty=not WINDOWS)
+@task
+def evaluate_NonLinearMLP(ctx: Context) -> None:
+    """Evaluate NonLinearMLP model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/evaluate.py --config configs/models/modelv1_param1.yaml", echo=True, pty=not WINDOWS)
+
+@task
+def evaluate_CNN(ctx: Context) -> None:
+    """Evaluate CNN model using config."""
+    ctx.run(f"python src/{PROJECT_NAME}/evaluate.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
 
 @task
 def test(ctx: Context) -> None:
@@ -46,19 +85,6 @@ def test(ctx: Context) -> None:
     ctx.run("coverage run -m pytest tests/", echo=True, pty=not WINDOWS)
     ctx.run("coverage report -m", echo=True, pty=not WINDOWS)
 
-@task
-def docker_build(ctx: Context, progress: str = "plain") -> None:
-    """Build docker images."""
-    ctx.run(
-        f"docker build -t train:latest . -f dockerfiles/train.dockerfile --progress={progress}",
-        echo=True,
-        pty=not WINDOWS
-    )
-    ctx.run(
-        f"docker build -t api:latest . -f dockerfiles/api.dockerfile --progress={progress}",
-        echo=True,
-        pty=not WINDOWS
-    )
 
 # Documentation commands
 @task(dev_requirements)

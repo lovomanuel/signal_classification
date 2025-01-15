@@ -2,6 +2,7 @@ import torch.nn as nn
 from config import load_config
 import os
 import torch
+import argparse
 
 class LinearMLP(nn.Module):
     """
@@ -12,12 +13,13 @@ class LinearMLP(nn.Module):
         hidden_size (int): Number of hidden units in the single hidden layer.
         num_classes (int): Number of output classes.
     """
+
     def __init__(self, input_features: int, hidden_size: int, num_classes: int):
         super().__init__()
         self.stack_layers = nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_features=input_features, out_features=hidden_size),
-            nn.Linear(in_features=hidden_size, out_features=num_classes)
+            nn.Linear(in_features=hidden_size, out_features=num_classes),
         )
 
     def forward(self, x):
@@ -43,6 +45,7 @@ class NonLinearMLP(nn.Module):
         num_classes (int): Number of output classes.
         dropout (float): Dropout probability.
     """
+
     def __init__(self, input_features: int, hidden_size: int, num_classes: int, dropout: float):
         super().__init__()
         self.stack_layers = nn.Sequential(
@@ -51,7 +54,7 @@ class NonLinearMLP(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(in_features=hidden_size, out_features=num_classes),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
     def forward(self, x):
@@ -77,24 +80,25 @@ class CNN(nn.Module):
         num_classes (int): Number of output classes.
         dropout (float): Dropout probability.
     """
+
     def __init__(self, input_features: int, hidden_size: int, num_classes: int, dropout: float):
         super().__init__()
         self.block1 = nn.Sequential(
             nn.Conv2d(in_channels=input_features, out_channels=hidden_size, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2)
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
         self.block2 = nn.Sequential(
             nn.Conv2d(in_channels=hidden_size, out_channels=hidden_size * 2, kernel_size=5, stride=1, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2)
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Linear(hidden_size * 2 * 7 * 7, 128),  # Assumes input image size of 28x28.
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(128, num_classes)
+            nn.Linear(128, num_classes),
         )
         self.dropout = nn.Dropout(dropout)
         self.batch_norm = nn.BatchNorm2d(hidden_size * 2)
@@ -137,7 +141,7 @@ def model(config_path):
             input_features=config["model"]["in_channels"],
             hidden_size=config["model"]["hidden_dim"],
             num_classes=config["model"]["num_classes"],
-            dropout=config["model"]["dropout"]
+            dropout=config["model"]["dropout"],
         )
     elif model_name == "LinearMLP":
         # Calculate input features for LinearMLP.
@@ -147,7 +151,7 @@ def model(config_path):
         model = LinearMLP(
             input_features=input_features,
             hidden_size=config["model"]["hidden_dim"],
-            num_classes=config["model"]["num_classes"]
+            num_classes=config["model"]["num_classes"],
         )
     elif model_name == "NonLinearMLP":
         # Calculate input features for NonLinearMLP.
@@ -158,7 +162,7 @@ def model(config_path):
             input_features=input_features,
             hidden_size=config["model"]["hidden_dim"],
             num_classes=config["model"]["num_classes"],
-            dropout=config["model"]["dropout"]
+            dropout=config["model"]["dropout"],
         )
     else:
         raise ValueError("Unsupported model name")
@@ -167,7 +171,9 @@ def model(config_path):
     print(f"Model architecture: {model}")
     print(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
 
-
 if __name__ == "__main__":
-    # Entry point for script execution.
-    model("configs/modelv0_param1.yaml")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, required=True, help="Path to the configuration file.")
+    args = parser.parse_args()
+    model(args.config)
+    

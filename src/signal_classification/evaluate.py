@@ -7,9 +7,8 @@ from data import dataLoader
 from config import load_config
 from model import LinearMLP, NonLinearMLP, CNN  # Import model classes.
 from helper import get_device  # Utility function to get the device (CPU/GPU).
-from torchmetrics import ConfusionMatrix
-from mlxtend.plotting import plot_confusion_matrix
-import matplotlib.pyplot as plt
+import argparse
+
 
 def evaluate(config_path):
     """
@@ -40,13 +39,13 @@ def evaluate(config_path):
             input_features=config["model"]["in_channels"],
             hidden_size=config["model"]["hidden_dim"],
             num_classes=config["model"]["num_classes"],
-            dropout=config["model"]["dropout"]
+            dropout=config["model"]["dropout"],
         )
         if not os.path.exists(path):
             raise ValueError("Model path does not exist")
         # Load the saved model state.
         if os.path.exists(path) and any(f.endswith(".pth") for f in os.listdir(path)):
-            model.load_state_dict(torch.load(os.path.join(path, os.listdir(path)[-3]), weights_only=True))
+            model.load_state_dict(torch.load(os.path.join(path, os.listdir(path)[-1]), weights_only=True))
         else:
             raise ValueError("Model file does not exist")
     elif model_name == "LinearMLP":
@@ -56,7 +55,7 @@ def evaluate(config_path):
         model = LinearMLP(
             input_features=input_features,
             hidden_size=config["model"]["hidden_dim"],
-            num_classes=config["model"]["num_classes"]
+            num_classes=config["model"]["num_classes"],
         )
         if not os.path.exists(path):
             raise ValueError("Model path does not exist")
@@ -72,7 +71,7 @@ def evaluate(config_path):
             input_features=input_features,
             hidden_size=config["model"]["hidden_dim"],
             num_classes=config["model"]["num_classes"],
-            dropout=config["model"]["dropout"]
+            dropout=config["model"]["dropout"],
         )
         if not os.path.exists(path):
             raise ValueError("Model path does not exist")
@@ -91,8 +90,6 @@ def evaluate(config_path):
     test_loss = 0
     correct = 0
     total = 0
-
-    num_classes = config["model"]["num_classes"]
 
     # Evaluate the model on the test dataset.
     all_preds = []
@@ -121,15 +118,13 @@ def evaluate(config_path):
     test_accuracy = 100 * correct / total
 
     # Store and print results.
-    results = {
-        "model_name": model.__class__.__name__,
-        "model_loss": test_loss,
-        "model_acc": test_accuracy
-    }
+    results = {"model_name": model.__class__.__name__, "model_loss": test_loss, "model_acc": test_accuracy}
     print(f"Model: {results['model_name']}")
     print(f"Loss: {results['model_loss']}")
     print(f"Accuracy: {results['model_acc']}")
 
 if __name__ == "__main__":
-    # Entry point for evaluation.
-    evaluate("configs/modelv0_param1.yaml")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, help="Path to the configuration file.")
+    args = parser.parse_args()
+    evaluate(args.config)

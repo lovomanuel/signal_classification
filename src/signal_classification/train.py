@@ -8,6 +8,7 @@ from model import LinearMLP, NonLinearMLP, CNN
 from config import load_config
 from helper import get_device
 import os
+import argparse
 
 
 def get_loss_function(loss_name):
@@ -29,7 +30,8 @@ def get_loss_function(loss_name):
         return nn.MSELoss()
     else:
         raise ValueError(f"Loss function '{loss_name}' not supported.")
-    
+
+
 def get_optimizer(optimizer_name, model_parameters, learning_rate):
     """
     Get the optimizer based on its name.
@@ -52,6 +54,7 @@ def get_optimizer(optimizer_name, model_parameters, learning_rate):
     else:
         raise ValueError(f"Optimizer '{optimizer_name}' not supported.")
 
+
 def train(config_path):
     """
     Train a model based on the configuration file.
@@ -72,13 +75,13 @@ def train(config_path):
     model_name = config["model"]["name"]
     opt = config["optimizer"]["optimizer"]
     los = config["loss"]["loss"]
-    
+
     if model_name == "CNN":
         model = CNN(
             input_features=config["model"]["in_channels"],
             hidden_size=config["model"]["hidden_dim"],
             num_classes=config["model"]["num_classes"],
-            dropout=config["model"]["dropout"]
+            dropout=config["model"]["dropout"],
         )
     elif model_name == "LinearMLP":
         # Determine input features based on data sample dimensions.
@@ -87,7 +90,7 @@ def train(config_path):
         model = LinearMLP(
             input_features=input_features,
             hidden_size=config["model"]["hidden_dim"],
-            num_classes=config["model"]["num_classes"]
+            num_classes=config["model"]["num_classes"],
         )
     elif model_name == "NonLinearMLP":
         # Determine input features based on data sample dimensions.
@@ -97,11 +100,11 @@ def train(config_path):
             input_features=input_features,
             hidden_size=config["model"]["hidden_dim"],
             num_classes=config["model"]["num_classes"],
-            dropout=config["model"]["dropout"]
+            dropout=config["model"]["dropout"],
         )
     else:
         raise ValueError("Unsupported model name")
-    
+
     # Prepare the device and model saving path.
     dev = get_device()  # Get CPU or GPU.
     model.to(dev)  # Move model to the device.
@@ -109,8 +112,7 @@ def train(config_path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     save_path = os.path.join(
-        path,
-        f"{config['model']['name']}_hidden{config['model']['hidden_dim']}_lr{config['training']['lr']}.pth"
+        path, f"{config['model']['name']}_hidden{config['model']['hidden_dim']}_lr{config['training']['lr']}.pth"
     )
 
     # Initialize optimizer and loss function.
@@ -123,9 +125,9 @@ def train(config_path):
         print(f"Epoch: {epoch}\n-------")
         save_path = os.path.join(
             path,
-            f"{config['model']['name']}_hidden{config['model']['hidden_dim']}_lr{config['training']['lr']}_epoch{epoch}.pth"
+            f"{config['model']['name']}_hidden{config['model']['hidden_dim']}_lr{config['training']['lr']}_epoch{epoch}.pth",
         )
-        
+
         ### Training
         model.train()  # Ensure the model is in training mode.
         train_loss = 0
@@ -140,7 +142,7 @@ def train(config_path):
 
         train_loss /= len(train_loader)  # Average training loss.
         print(f"Train loss: {train_loss}")
-        
+
         ### Validation
         model.eval()  # Set the model to evaluation mode.
         val_loss = 0
@@ -166,16 +168,20 @@ def train(config_path):
         if val_loss < min_val_loss and config["training"]["save_model"]:
             print(f"Validation loss decreased from {min_val_loss:.4f} to {val_loss:.4f}. Saving model to {save_path}")
             min_val_loss = val_loss
-            #elimina il precedente contenuto della cartella
+            # elimina il precedente contenuto della cartella
             for f in os.listdir(path):
                 os.remove(os.path.join(path, f))
             torch.save(model.state_dict(), save_path)
 
         print(f"Validation accuracy: {val_accuracy:.2f}%")
         print("\n")
-    
+
     print("Training complete!")
+
 
 if __name__ == "__main__":
     # Entry point for script execution.
-    train("configs/modelv0_param1.yaml")
+    parser = argparse.ArgumentParser(description="Train a model for signal classification.")
+    parser.add_argument("--config", type=str, help="Path to the configuration file.")
+    args = parser.parse_args()
+    train(args.config)
