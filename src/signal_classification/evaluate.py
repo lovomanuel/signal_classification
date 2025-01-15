@@ -3,7 +3,7 @@ from train import get_loss_function
 import torch
 from tqdm import tqdm
 import os
-from data import get_data_loaders
+from data import dataLoader
 from config import load_config
 from model import LinearMLP, NonLinearMLP, CNN  # Import model classes.
 from helper import get_device  # Utility function to get the device (CPU/GPU).
@@ -27,7 +27,7 @@ def evaluate(config_path):
         ValueError: If the model path or trained model file is missing.
     """
     config = load_config(config_path)  # Load configuration.
-    _, _, test_loader = get_data_loaders(config_path)  # Get test DataLoader.
+    _, _, test_loader = dataLoader(config_path)  # Get test DataLoader.
 
     # Extract configurations for model, loss, and saved model path.
     los = config["loss"]["loss"]

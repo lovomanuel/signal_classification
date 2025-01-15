@@ -141,7 +141,7 @@ def model(config_path):
         )
     elif model_name == "LinearMLP":
         # Calculate input features for LinearMLP.
-        image_path = os.path.join(PATH, "train", "train_img_0.pt")
+        image_path = os.path.join(PATH, "Training", "train_img_0_31.pt")
         image = torch.load(image_path, weights_only=True)
         input_features = image[0].shape[0] * image[0].shape[1] * image[0].shape[2]
         model = LinearMLP(

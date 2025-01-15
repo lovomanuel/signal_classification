@@ -434,16 +434,6 @@ def show_images(loader):
     plt.show()
 
 
-if __name__ == "__main__":
-    assert_data()
-
-    config_path = "configs/modelv0_param1.yaml"
-
-    train_loader, val_loader, test_loader = dataLoader(config_path)
-
-    # Display random images from the training dataset
-    show_images(train_loader)
-
 
 
     

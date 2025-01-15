@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data.dataloader
 from tqdm.auto import tqdm
-from data import get_data_loaders
+from data import dataLoader
 from model import LinearMLP, NonLinearMLP, CNN
 from config import load_config
 from helper import get_device
@@ -66,7 +66,7 @@ def train(config_path):
     """
     # Load configuration and data loaders.
     config = load_config(config_path)
-    train_loader, val_loader, _ = get_data_loaders(config_path)
+    train_loader, val_loader, _ = dataLoader(config_path)
 
     # Initialize the model.
     model_name = config["model"]["name"]
@@ -166,6 +166,9 @@ def train(config_path):
         if val_loss < min_val_loss and config["training"]["save_model"]:
             print(f"Validation loss decreased from {min_val_loss:.4f} to {val_loss:.4f}. Saving model to {save_path}")
             min_val_loss = val_loss
+            #elimina il precedente contenuto della cartella
+            for f in os.listdir(path):
+                os.remove(os.path.join(path, f))
             torch.save(model.state_dict(), save_path)
 
         print(f"Validation accuracy: {val_accuracy:.2f}%")
