@@ -11,6 +11,7 @@ import requests
 import logging
 import zipfile
 import shutil
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -203,6 +204,53 @@ class GTSRBDatasetRaw(Dataset):
         label = torch.tensor(int(label), dtype=torch.long)  # Convert label to tensor.
         return img, label
     
+def save_processed_data(dataset, output_path, split):
+    """
+    Save preprocessed data to disk.
+
+    Args:
+        loader (Dataset): Dataset containing the samples to save.
+        output_path (str): Directory to save the processed data.
+        split (str): Dataset split name (e.g., "train", "test").
+    """
+    if split not in ['train', 'test']:
+            raise ValueError('split must be either "train", "test"')
+    base_folder = 'Training' if split == 'train' else 'Test'
+    split_path = os.path.join(output_path, base_folder)
+    os.makedirs(split_path, exist_ok=True)  # Create the directory if it does not exist.
+    logger.info(f"Saving {base_folder} data to '{split_path}' folder...")
+    for idx in tqdm(range(len(dataset)), desc="Processing dataset"):
+        image, label = dataset[idx]
+        label_int = label.item()
+
+        #save as png
+        img_path = os.path.join(split_path, f"{split}_img_{idx}_{label_int}.png")
+        if image.shape[0] == 1:  # Grayscale
+            image = image.squeeze(0).numpy()  # Remove channel dimension
+        else:  # RGB
+            image = image.permute(1, 2, 0).numpy()  # Rearrange to (H, W, C)
+        image = (image * 255).astype('uint8')
+        image = Image.fromarray(image)
+        image.save(img_path)
+        logger.debug(f"Saved image {img_path}")
+    logger.info(f"Processed {base_folder} data saved to '{split_path}' folder.")
+
+def assert_processed_data():
+    """
+    Verify that the required processed dataset directories exist. If not, trigger the data processing process.
+
+    Checks for the presence of the "data/processed/Training" and "data/processed/Test" directories. If either
+    directory is missing, it calls the `save_processed_data` function to process and save the datasets.
+
+    Logs the status of the processed dataset directories.
+    """
+    processed_path = "data/processed"
+    if not os.path.exists(processed_path):
+        logger.info("Processed data directories not found. Processing data...")
+        os.makedirs(processed_path, exist_ok=True)
+    else:
+        logger.info("Processed data directories found.")
+    
 
 class GTSRBDatasetProcessed(Dataset):
     """
@@ -210,14 +258,14 @@ class GTSRBDatasetProcessed(Dataset):
 
     Args:
         processed_path (str): Path to the directory containing processed data.
-        split (str): Dataset split, one of "train", "test", or "val".
+        split (str): Dataset split, one of "train", "test".
 
     Raises:
-        ValueError: If the split is not "train", "test", or "val".
+        ValueError: If the split is not "train", "test".
     """
     def __init__(self, processed_path: str, split: str):
-        if split not in ['train', 'test', 'val']:
-            raise ValueError('split must be either "train", "test", or "val"')
+        if split not in ['train', 'test']:
+            raise ValueError('split must be either "train", "test"')
         self.processed_path = processed_path
         self.split = split
         self.data = []
@@ -253,23 +301,7 @@ class GTSRBDatasetProcessed(Dataset):
         return img, label
     
 
-def save_processed_data(loader, output_path, split):
-    """
-    Save preprocessed data to disk.
 
-    Args:
-        loader (DataLoader): DataLoader containing the samples to save.
-        output_path (str): Directory to save the processed data.
-        split (str): Dataset split name (e.g., "train", "val", "test").
-    """
-    split_path = os.path.join(output_path, split)
-    os.makedirs(split_path, exist_ok=True)  # Create the directory if it does not exist.
-    for idx, (img, label) in enumerate(loader):
-        img = img.squeeze(0)  # Remove batch dimension.
-        label = label.squeeze(0)
-        file_path = os.path.join(split_path, f"{split}_img_{idx}.pt")
-        torch.save((img, label), file_path)  # Save image and label as .pt file.
-    print(f"Saved {split} data to {split_path}")
 
 
 def get_data_loaders(config_path: str, original: bool = False):
@@ -336,24 +368,18 @@ def get_data_loaders(config_path: str, original: bool = False):
 
 if __name__ == "__main__":
     assert_data()
-    training_dataset = GTSRBDatasetRaw("data/raw", "train")
-    test_dataset = GTSRBDatasetRaw("data/raw", "test")
 
-    print(f"Training dataset size: {len(training_dataset)}")
-    print(f"Test dataset size: {len(test_dataset)}")
+    transform = Compose([
+        Resize((32, 32)),
+        ToTensor()
+    ])
 
-    image, label = training_dataset[0]
+    training_dataset = GTSRBDatasetRaw("data/raw", "train", transform)
+    test_dataset = GTSRBDatasetRaw("data/raw", "test", transform)
 
-    print(f"Image shape: {image.shape}")
-    print(f"Label: {label}")
-    print(f"Label type: {type(label)}")
-    print(f"Label shape: {label.shape}")
+    save_processed_data(training_dataset, "data/processed", "train")
+    save_processed_data(test_dataset, "data/processed", "test")
 
-    image_1, label_1 = test_dataset[1]
-    print(f"Image 1 shape: {image_1.shape}")
-    print(f"Label 1: {label_1}")
-    print(f"Label 1 type: {type(label_1)}")
-    print(f"Label 1 shape: {label_1.shape}")
 
 
 
