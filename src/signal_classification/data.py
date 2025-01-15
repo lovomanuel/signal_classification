@@ -128,8 +128,6 @@ def assert_data():
         logger.info("Data directories found.")
 
 
-
-
 class GTSRBDatasetRaw(Dataset):
     """
     Custom Dataset class for loading raw GTSRB data.
@@ -143,14 +141,14 @@ class GTSRBDatasetRaw(Dataset):
         ValueError: If the split is not "train", "test", or "val".
     """
     def __init__(self, root: str, split: str, transform=None):
-        if split not in ['train', 'test', 'val']:
-            raise ValueError('split must be either "train", "test", or "val"')
+        if split not in ['train', 'test']:
+            raise ValueError('split must be either "train", "test"')
         self.root = root 
         self.split = split
         self.transform = transform
 
         # Define the base folder based on the dataset split.
-        base_folder = 'Training' if split == 'train' else 'Final_Test/Images'
+        base_folder = 'Training/Images' if split == 'train' else 'Test/Images'
         self.labels = []
         self.data = []
 
@@ -200,6 +198,8 @@ class GTSRBDatasetRaw(Dataset):
         img = Image.open(img_path)  # Open the image.
         if self.transform:
             img = self.transform(img)  # Apply transformations.
+        else:
+            img = ToTensor()(img)
         label = torch.tensor(int(label), dtype=torch.long)  # Convert label to tensor.
         return img, label
     
@@ -335,4 +335,26 @@ def get_data_loaders(config_path: str, original: bool = False):
 
 
 if __name__ == "__main__":
-    download_data()
+    assert_data()
+    training_dataset = GTSRBDatasetRaw("data/raw", "train")
+    test_dataset = GTSRBDatasetRaw("data/raw", "test")
+
+    print(f"Training dataset size: {len(training_dataset)}")
+    print(f"Test dataset size: {len(test_dataset)}")
+
+    image, label = training_dataset[0]
+
+    print(f"Image shape: {image.shape}")
+    print(f"Label: {label}")
+    print(f"Label type: {type(label)}")
+    print(f"Label shape: {label.shape}")
+
+    image_1, label_1 = test_dataset[1]
+    print(f"Image 1 shape: {image_1.shape}")
+    print(f"Label 1: {label_1}")
+    print(f"Label 1 type: {type(label_1)}")
+    print(f"Label 1 shape: {label_1.shape}")
+
+
+
+
