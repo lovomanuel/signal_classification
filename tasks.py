@@ -51,19 +51,35 @@ def CNN(ctx: Context) -> None:
     ctx.run(f"python src/{PROJECT_NAME}/model.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
 
 @task
-def train_LinearMLP(ctx: Context) -> None:
+def train_LinearMLP(ctx: Context, api_key = None) -> None:
     """Train model LinearMLP model using config."""
-    ctx.run(f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv0_param1.yaml", echo=True, pty=not WINDOWS)
+    command = f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv0_param1.yaml"
+
+    if api_key:
+        command += f" --api_key {api_key}"
+    
+    ctx.run(command, echo=True, pty=not WINDOWS)
+
 
 @task
-def train_NonLinearMLP(ctx: Context) -> None:
-    """Train model NonLinearMLP model using config."""
-    ctx.run(f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv1_param1.yaml", echo=True, pty=not WINDOWS)
+def train_NonLinearMLP(ctx: Context, api_key = None) -> None:
+    """Train model LinearMLP model using config."""
+    command = f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv1_param1.yaml"
+
+    if api_key:
+        command += f" --api_key {api_key}"
+    
+    ctx.run(command, echo=True, pty=not WINDOWS)
 
 @task
-def train_CNN(ctx: Context) -> None:
-    """Train model CNN model using config."""
-    ctx.run(f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv2_param1.yaml", echo=True, pty=not WINDOWS)
+def train_CNN(ctx: Context, api_key = None) -> None:
+    """Train model LinearMLP model using config."""
+    command = f"python src/{PROJECT_NAME}/train.py --config configs/models/modelv2_param1.yaml"
+
+    if api_key:
+        command += f" --api_key {api_key}"
+    
+    ctx.run(command, echo=True, pty=not WINDOWS)
 
 @task
 def evaluate_LinearMLP(ctx: Context) -> None:
