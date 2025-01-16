@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data.dataloader
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from data import dataLoader
 from model import LinearMLP, NonLinearMLP, CNN
 from config import load_config
@@ -64,7 +64,7 @@ def get_optimizer(optimizer_name, model_parameters, learning_rate):
     else:
         raise ValueError(f"Optimizer '{optimizer_name}' not supported.")
 
-def train(config_path):
+def train(config_path, api_key):
     """
     Train a model based on the configuration file.
 
@@ -115,6 +115,9 @@ def train(config_path):
 
     logger.info("Initialized %s model", model_name)
 
+
+    # Initialize WandB
+    wandb.login(key=api_key)
     wandb.init(project="signal-classification", config={"model": model_name, "optimizer": opt, "loss": los, "lr": config["training"]["lr"], "epochs": config["training"]["epochs"]})
 
     # Prepare the device and model saving path.
@@ -213,5 +216,6 @@ def train(config_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a model for signal classification.")
     parser.add_argument("--config", type=str, help="Path to the configuration file.")
+    parser.add_argument("--api_key", type=str, help="WandB API key.")
     args = parser.parse_args()
-    train(args.config)
+    train(args.config, args.api_key)
