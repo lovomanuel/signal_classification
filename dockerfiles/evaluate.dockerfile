@@ -17,5 +17,5 @@ RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 RUN pip install -r requirements_dev.txt --no-cache-dir --verbose
 RUN pip install . --no-deps --no-cache-dir --verbose
 
-ENTRYPOINT ["python", "-u", "src/signal_classification/train.py"]
+ENTRYPOINT ["python", "-u", "src/signal_classification/evaluate.py"]
 CMD []
