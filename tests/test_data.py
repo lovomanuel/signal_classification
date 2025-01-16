@@ -34,7 +34,7 @@ def test_dataloader():
     
 
     assert isinstance(img, torch.Tensor), "Image is not a PyTorch Tensor."
-    assert img.ndim == batch_size, "Image does not have 4 dimensions (B, C, H, W)."
+    assert img.ndim == 4, "Image does not have 4 dimensions (B, C, H, W)."
     assert isinstance(label, torch.Tensor), "Label is not a PyTorch Tensor."
 
 

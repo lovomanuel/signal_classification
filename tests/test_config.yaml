@@ -5,3 +5,8 @@ data:
   batch_size: 32
   split_percentage: 0.8
   num_workers: 4
+
+transforms:
+  resize: [32, 32]
+  rotation: 15
+  horizontal_flip: 0.5

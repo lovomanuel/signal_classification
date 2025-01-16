@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, random_split
 import matplotlib.pyplot as plt
 import os
 from PIL import Image
-from config import load_config
+from signal_classification.config import load_config
 import requests
 import logging
 import zipfile
