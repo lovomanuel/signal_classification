@@ -205,6 +205,7 @@ class GTSRBDatasetRaw(Dataset):
         if self.transform:
             img = self.transform(img)  # Apply transformations.
         else:
+            img = Resize((32, 32))(img)  # Resize the image to 32x32 pixels.
             img = ToTensor()(img)
         label = torch.tensor(int(label), dtype=torch.long)  # Convert label to tensor.
         return img, label

@@ -1,0 +1,7 @@
+data:
+  use_processed: false  # Set to true to use preprocessed data
+  processed_path: "data/processed/"
+  raw_path: "data/raw/" 
+  batch_size: 32
+  split_percentage: 0.8
+  num_workers: 4
