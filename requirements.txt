@@ -1,4 +1,15 @@
-torch==2.5.1
-typer==0.15.1
 fastapi==0.115.6
 uvicorn==0.34.0
+pandas==2.2.3
+numpy==2.2.1
+scikit-learn==1.6.0
+matplotlib==3.10.0
+torch==2.5.1
+torchvision==0.20.1
+torchmetrics==1.6.1
+pydantic==2.10.4
+scipy==1.15.0
+mlxtend==0.23.3
+sympy==1.13.1
+requests==2.32.3
+tqdm == 4.67.1
